@@ -1,0 +1,1 @@
+Needed for empty folder to be handled by github
