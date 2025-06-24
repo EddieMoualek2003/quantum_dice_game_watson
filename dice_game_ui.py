@@ -5,7 +5,7 @@ import time
 import queue
 from PIL import Image, ImageSequence
 from dice_game_functions import dice_game_main
-from wake_word_listener import active_listen  # ⬅ Import active listener
+from watson_stt import record_audio, transcribe_ibm  # Use IBM STT instead
 
 FIGURE_PATH = "resource_folder/schrodinger_dice_wavefunction_collapse.gif"
 
@@ -113,13 +113,18 @@ def run_dice_gui_controlled(command_queue: queue.Queue):
                     draw_interface()
                     pygame.display.flip()
 
-                    voice_command = active_listen(timeout=5).lower()
-                    print("[VOICE]:", voice_command)
+                    try:
+                        record_audio("test.wav", duration=5)
+                        voice_command = transcribe_ibm("test.wav").lower()
+                        print("[VOICE]:", voice_command)
 
-                    if any(k in voice_command for k in ["roll", "dice", "throw"]):
-                        command_queue.put("roll")
-                    elif any(k in voice_command for k in ["exit", "stop"]):
-                        command_queue.put("exit")
+                        if any(k in voice_command for k in ["roll", "dice", "throw"]):
+                            command_queue.put("roll")
+                        elif any(k in voice_command for k in ["exit", "stop"]):
+                            command_queue.put("exit")
+                    except Exception as e:
+                        print(f"[ERROR] Voice processing failed: {e}")
+                        message = "Voice command failed. Try again."
 
             elif event.type == pygame.VIDEORESIZE:
                 WIDTH, HEIGHT = event.w, event.h

@@ -6,7 +6,7 @@ from time import sleep
 from dice_game_functions import *
 from ibm_qc_interface import *
 # from llm_interface import query_llm
-from wake_word_listener import active_listen  # still available for GUI button
+# from wake_word_listener import active_listen  # still available for GUI button
 from watson_stt import *
 
 # ========== OUTPUT METHODS ==========
