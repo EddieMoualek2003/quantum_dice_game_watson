@@ -13,12 +13,16 @@ WAKE_WORD = "hey watson"
 # Audio queue
 q = queue.Queue()
 
-# Setup Vosk model once
+# Setup Vosk model
 model = vosk.Model(MODEL_PATH)
+
+# Use a commonly supported sample rate
+SAMPLE_RATE = 44100
+BLOCK_SIZE = 2048  # Smaller block size helps with real-time response
 
 def audio_callback(indata, frames, time_info, status):
     if status:
-        print("Audio callback status:", status)
+        print("[WARNING] Audio callback status:", status)
     q.put(bytes(indata))
 
 
@@ -28,20 +32,20 @@ def passive_listen():
     """
     print(">>> Passive listening for wake word...")
 
-    with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
+    with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE, dtype='int16',
                            channels=1, callback=audio_callback):
-        rec = vosk.KaldiRecognizer(model, 16000)
+        rec = vosk.KaldiRecognizer(model, SAMPLE_RATE)
 
         while True:
             data = q.get()
             if rec.AcceptWaveform(data):
                 result = json.loads(rec.Result())
                 text = result.get("text", "").lower()
-                print("Heard:", text)
+                print("[Heard]:", text)
 
                 if WAKE_WORD in text:
                     print(" << Wake word detected! >> ")
-                    return  # exit to trigger active listen
+                    return  # Trigger active listen
 
 
 def active_listen(timeout=5):
@@ -50,9 +54,9 @@ def active_listen(timeout=5):
     """
     print(f" << Active listening for {timeout} seconds... >> ")
 
-    with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
+    with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE, dtype='int16',
                            channels=1, callback=audio_callback):
-        rec = vosk.KaldiRecognizer(model, 16000)
+        rec = vosk.KaldiRecognizer(model, SAMPLE_RATE)
         start_time = time.time()
         captured = ""
 
@@ -63,6 +67,12 @@ def active_listen(timeout=5):
                 text = result.get("text", "").strip()
                 if text:
                     captured += " " + text
+            else:
+                # Optional: include partials
+                partial = json.loads(rec.PartialResult()).get("partial", "").strip()
+                if partial:
+                    print(f"[partial] {partial}", end="\r")
 
-        print(" << Captured command:", captured.strip(), ">> ")
-        return captured.strip()
+        final_result = captured.strip()
+        print(f"\n << Captured command: '{final_result}' >>")
+        return final_result
