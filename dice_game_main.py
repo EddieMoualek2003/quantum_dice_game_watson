@@ -3,21 +3,15 @@ import queue
 import argparse
 import sys
 from time import sleep
-import os
 
 from dice_game_functions import *
 from ibm_qc_interface import *
+# from llm_interface import query_llm
 from wake_word_listener import passive_listen, active_listen
 from watson_stt import *
 
-# ========== INTERFACE CHECK ==========
-
-def is_gui_available():
-    """Check if GUI display is available (e.g., X11 or similar)."""
-    return os.environ.get('DISPLAY') is not None
 
 # ========== OUTPUT METHODS ==========
-
 def display_on_leds(selected):
     try:
         print("[INFO] Attempting LED output...")
@@ -35,6 +29,7 @@ def display_on_emulator(selected):
         sense.clear()
         BLUE = (0, 0, 255)
         RED = (255, 0, 0)
+        BLACK = (0, 0, 0)
 
         row = 3
         start_col = 2
@@ -54,9 +49,8 @@ def display_on_emulator(selected):
 def display_cli(selected):
     print(f"[CLI OUTPUT] Quantum Dice Result: {selected}")
 
-# ========== MAIN GAME LOGIC ==========
 
-def run_dice(display_mode="cli"):
+def dice_game_main(display_mode="cli"):
     qc = createCircuit()
     counts = ideal_simulator(qc)[0]
     selected = returnSelectedState(counts)
@@ -74,53 +68,49 @@ def run_dice(display_mode="cli"):
 
     return counts
 
-# ========== FALLBACK CLI WORKER ==========
 
+# ========== FALLBACK WORKER ==========
 def fallback_worker(command_queue):
     print("[INFO] Running CLI fallback worker. Awaiting commands...")
     while True:
         cmd = command_queue.get()
         if cmd == "roll":
-            run_dice(display_mode="cli")
+            dice_game_main(display_mode="cli")
         elif cmd == "exit":
             print("Exiting fallback worker.")
             break
         else:
             print(f"[WARNING] Unknown command: {cmd}")
 
-# ========== GAME THREAD LAUNCHER ==========
 
+# ========== GUI OR FALLBACK STARTER ==========
 def start_game_thread(command_queue):
-    if is_gui_available():
-        try:
-            from dice_game_ui import run_dice_gui_controlled as gui_runner
-            gui_runner(command_queue)
-            return
-        except Exception as e:
-            print(f"[INFO] GUI failed to load: {e}")
-    else:
-        print("[INFO] No GUI environment detected.")
+    try:
+        from dice_game_ui import run_dice_gui_controlled as gui_runner
+        gui_runner(command_queue)
+    except Exception as e:
+        print(f"[INFO] GUI not available or failed: {e}")
+        fallback_worker(command_queue)
 
-    fallback_worker(command_queue)
 
-# ========== WAKE-WORD + SPEECH-TO-TEXT CONTROL ==========
-
+# ========== WAKE-WORD + ACTIVE STT CHATBOT ==========
 def simulate_chatbot_loop(command_queue):
     while True:
         try:
             passive_listen()
+            
             record_audio("test.wav", duration=5)
             spoken = transcribe_ibm("test.wav")
 
             if not spoken:
                 print("[INFO] No speech detected.")
                 continue
+            reply = spoken # query_llm(spoken)
+            print("LLM:", reply)
 
-            print("LLM:", spoken)  # Or use query_llm(spoken) if enabled
-
-            if any(k in spoken.lower() for k in ["roll", "dice", "throw"]):
+            if any(k in reply.lower() for k in ["roll", "dice", "throw"]):
                 command_queue.put("roll")
-            elif any(k in spoken.lower() for k in ["exit", "stop"]):
+            elif any(k in reply.lower() for k in ["exit", "stop"]):
                 command_queue.put("exit")
                 sys.exit()
 
@@ -128,14 +118,15 @@ def simulate_chatbot_loop(command_queue):
             command_queue.put("exit")
             break
 
-# ========== ENTRY POINT ==========
 
+# ========== MAIN ==========
 def dice_game_main():
     q = queue.Queue()
     game_thread = threading.Thread(target=start_game_thread, args=(q,))
     game_thread.start()
     simulate_chatbot_loop(q)
     game_thread.join()
+
 
 if __name__ == "__main__":
     dice_game_main()

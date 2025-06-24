@@ -7,14 +7,15 @@ from PIL import Image, ImageSequence
 from dice_game_functions import dice_game_main
 
 FIGURE_PATH = "resource_folder/schrodinger_dice_wavefunction_collapse.gif"
-# ... (imports unchanged)
 
 def run_dice_gui_controlled(command_queue: queue.Queue):
+    # Initialization
     pygame.init()
     WIDTH, HEIGHT = 800, 480
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption("Schroedinger's Dice Game")
 
+    # UI
     COLORS = {
         "BACKGROUND": (233, 206, 255),
         "TEXT": (26, 0, 71),
@@ -31,17 +32,17 @@ def run_dice_gui_controlled(command_queue: queue.Queue):
     def get_layout():
         return {
             "exit_button": pygame.Rect(WIDTH * 0.02, HEIGHT * 0.03, WIDTH * 0.08, HEIGHT * 0.06),
-            "roll_button": pygame.Rect(WIDTH * 0.45, HEIGHT * 0.85, WIDTH * 0.15, HEIGHT * 0.07),
             "figure_box": pygame.Rect(WIDTH * 0.6, HEIGHT * 0.25, WIDTH * 0.35, HEIGHT * 0.5),
             "title_pos": (WIDTH * 0.35, HEIGHT * 0.07),
             "message_pos": (WIDTH * 0.1, HEIGHT * 0.23),
             "label_pos": (WIDTH * 0.6 + WIDTH * 0.05, HEIGHT * 0.22)
         }
 
+    # Animation
     gif_frames = []
     gif_frame_index = 0
     gif_last_update = 0
-    gif_frame_delay = 100
+    gif_frame_delay = 100  # ms
     message = "Waiting for dice command..."
 
     def load_and_display_gif():
@@ -63,25 +64,22 @@ def run_dice_gui_controlled(command_queue: queue.Queue):
         nonlocal gif_frame_index, gif_last_update, FONT, BIG_FONT
         FONT, BIG_FONT = get_fonts()
         layout = get_layout()
+        exit_button = layout["exit_button"]
+        figure_box = layout["figure_box"]
+        title_pos = layout["title_pos"]
+        message_pos = layout["message_pos"]
+        label_pos = layout["label_pos"]
+
         screen.fill(COLORS["BACKGROUND"])
 
-        # Exit button
-        pygame.draw.rect(screen, COLORS["EXIT_BTN"], layout["exit_button"], border_radius=10)
-        screen.blit(FONT.render("Exit", True, COLORS["TEXT"]), (layout["exit_button"].x + 10, layout["exit_button"].y + 5))
+        pygame.draw.rect(screen, COLORS["EXIT_BTN"], exit_button, border_radius=10)
+        screen.blit(FONT.render("Exit", True, COLORS["TEXT"]), (exit_button.x + 10, exit_button.y + 5))
+        screen.blit(BIG_FONT.render("Schrodinger's Dice", True, COLORS["TEXT"]), title_pos)
+        screen.blit(FONT.render(message, True, COLORS["TEXT"]), message_pos)
 
-        # Roll button
-        pygame.draw.rect(screen, COLORS["BUTTON"], layout["roll_button"], border_radius=10)
-        screen.blit(FONT.render("Roll Dice", True, COLORS["TEXT"]),
-                    (layout["roll_button"].x + 10, layout["roll_button"].y + 5))
-
-        # Titles and messages
-        screen.blit(BIG_FONT.render("Schrodinger's Dice", True, COLORS["TEXT"]), layout["title_pos"])
-        screen.blit(FONT.render(message, True, COLORS["TEXT"]), layout["message_pos"])
-        screen.blit(FONT.render("Simulation Output", True, COLORS["TEXT"]), layout["label_pos"])
-
-        # Figure display
-        pygame.draw.rect(screen, COLORS["FIGURE_BOX"], layout["figure_box"], border_radius=15)
-        pygame.draw.rect(screen, COLORS["TEXT"], layout["figure_box"], 2, border_radius=15)
+        screen.blit(FONT.render("Simulation Output", True, COLORS["TEXT"]), label_pos)
+        pygame.draw.rect(screen, COLORS["FIGURE_BOX"], figure_box, border_radius=15)
+        pygame.draw.rect(screen, COLORS["TEXT"], figure_box, 2, border_radius=15)
 
         if gif_frames:
             current_time = pygame.time.get_ticks()
@@ -89,8 +87,8 @@ def run_dice_gui_controlled(command_queue: queue.Queue):
                 gif_frame_index = (gif_frame_index + 1) % len(gif_frames)
                 gif_last_update = current_time
             frame = gif_frames[gif_frame_index]
-            scaled = pygame.transform.smoothscale(frame, (layout["figure_box"].width, layout["figure_box"].height))
-            screen.blit(scaled, (layout["figure_box"].x, layout["figure_box"].y))
+            scaled = pygame.transform.smoothscale(frame, (figure_box.width, figure_box.height))
+            screen.blit(scaled, (figure_box.x, figure_box.y))
 
         pygame.display.flip()
 
@@ -108,9 +106,6 @@ def run_dice_gui_controlled(command_queue: queue.Queue):
                 layout = get_layout()
                 if layout["exit_button"].collidepoint(event.pos):
                     running = False
-                elif layout["roll_button"].collidepoint(event.pos):
-                    print("[INFO] Roll button clicked.")
-                    command_queue.put("roll")
             elif event.type == pygame.VIDEORESIZE:
                 WIDTH, HEIGHT = event.w, event.h
                 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
@@ -138,3 +133,4 @@ def run_dice_gui_controlled(command_queue: queue.Queue):
 
     pygame.quit()
     sys.exit()
+
